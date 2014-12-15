@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8" />
+  <meta name="Author" content="Matthew Lewis" />
+  <meta name="Keywords" content="" />
+  <meta name="Description" content="HTTP based Onkyo reciever remote control" />
+  <meta name="viewport" content="width=320, initial-scale=1" />
+  <title>phpOnkyo</title>
+
+  <script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script>
+		$(document).ready(function(){
+
+			$.get('detect.php', { cmd:'!xECN', param:'QSTN' }, function(data) {
+				var result = jQuery.parseJSON(data);
+
+				$('#ip_address').text(result.modelIP);
+				$('#port').text(result.modelPort);
+				$('#model').text(result.modelName + ' (' + result.modelCountry + ')');
+				$('#log').append(data);
+
+				sendCommand('PWR', 'QSTN');
+			});
+		});
+
+		$(document).on('change', 'input[type="range"]', function () {
+			var cmdID = $(this).parent().find('h1').attr('data-command');
+			var paramID = $(this).val();
+			sendCommand(cmdID, paramID);
+			return false;
+		});
+		
+			$(document).on('click', "a", function () {
+				if ($(this).attr('data-command') === undefined) {
+					var cmdID = $(this).parent().parent().parent().find('h1').attr('data-command');
+				}
+				else {
+					var cmdID = $(this).attr('data-command');
+				}
+				var paramID = $(this).attr('data-param');
+
+				sendCommand(cmdID, paramID);
+				
+				return false;
+			});
+
+			function sendCommand(c, p) {
+				$.get('command.php', { ip:$('#ip_address').text(), port:$('#port').text(), cmd:c, param:p }, function(data) {
+					$('#log').append(data + '<br />');
+
+					var result = jQuery.parseJSON(data);
+
+					switch (result.cmdCode) {
+					case 'PWR':
+						if (result.statusReply == '01') {
+							$('#power').html('On -- <a href="#" data-command="PWR" data-param="00">Turn off</a>');
+							sendCommand('MVL', 'QSTN');
+						}
+						else {
+							$('#power').html('Off -- <a href="#" data-command="PWR" data-param="01">Turn on</a>');
+						}
+						break;
+					case 'MVL':
+						$('#current_vol').text(result.statusReply);
+						sendCommand('AMT', 'QSTN');
+						break;
+					case 'AMT':
+						if (result.statusReply == '01') {
+							$('#mute').html('On -- <a href="#" data-command="AMT" data-param="00">Turn off</a>');
+						}
+						else {
+							$('#mute').html('Off -- <a href="#" data-command="AMT" data-param="01">Turn on</a>');
+						}
+						sendCommand('SLI', 'QSTN');
+						break;
+					case 'SLI':
+						sendCommand('LMD', 'QSTN');
+						$('h1[data-command="' + result.cmdCode + '"]').parent().find('#current').text(result.statusReply);
+						break;
+					default:
+						if (result.cmdParam == 'QSTN' && result.statusReply != null) {
+							$('h1[data-command="' + result.cmdCode + '"]').parent().find('#current').text(result.statusReply);
+						}
+						break;
+					}
+
+				});
+				return true;
+			}
+  </script>
+
+  <style type="text/css">
+	body {
+		background-color: #0c2d43;
+		color: #FFFFFF;
+		font-family: Arial, sans-serif;
+	}
+	img {
+		display: block;
+		margin: 0 auto;
+	}
+	hr {
+		border-color: #239de7;
+		color: #239de7;
+	}
+	a {
+		color: #239de7;
+	}
+	div#info {
+		font-weight: bold;
+		color: #239de7;
+	}
+	div.window {		
+		background: #0b1e2a;
+		border: 3px solid #004e9b;
+		border-top: 29px solid #004e9b;
+		margin: 9px auto;
+		padding: 5px;
+		padding-bottom: 14px;
+		border-top-right-radius: 6px;
+		border-top-left-radius: 6px;
+		border-bottom-right-radius: 1em;
+		border-bottom-left-radius: 1em;
+		box-shadow: 2px 2px 7px #002448;
+		width: 300px;
+		min-height: 30px;
+	}
+	.window h1 {
+		font-size: 15pt;
+		margin-top: -30px;
+		color: #239de7;
+		text-shadow: 2px 2px 5px #002448;
+	}
+	span {
+		font-weight: normal;
+		color: #FFFFFF;
+	}
+	::selection {
+		color: #ff6600;
+		background: transparent;
+	}
+	input[type=range]{
+    -webkit-appearance: none;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 300px;
+    height: 9px;
+    background: #004e9b;
+    border: none;
+    border-radius: 6px;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    border: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #239de7;
+    margin-top: -4px;
+}
+
+input[type=range]:focus {
+    outline: none;
+}
+
+input[type=range]:focus::-webkit-slider-runnable-track {
+    background: #002448;
+}
+  </style>
+ </head>
+ <body>
+<img src="onkyo.png" alt="Onkyo" />
+<hr />
+<div id="info">
+	<div id="reciever">
+		Reciever: <span id="ip_address">192.168.0.0</span>:<span id="port">61028</span>
+		<br />
+		Model: <span id="model">Unknown</span>
+		<br />
+		Power: <span id="power"></span>
+	</div>
+	<div id="log">
+
+	</div>
+</div>
+
+<div class="window" id="input_selector">
+	<h1 data-command="SLI">INPUT SELECTOR</h1>
+	<dl>
+		<dt>Current:</dt>
+		<dd id="current"><a href="#" data-param="QSTN">Get current</a></dd>
+	</dl>
+	<ul>
+		<li><a href="#" data-param="23">TV/CD</a></li>
+		<li><a href="#" data-param="00">STB/DVR</a></li>
+		<li><a href="#" data-param="01">CBL/SAT</a></li>
+		<li><a href="#" data-param="02">GAME</a></li>
+		<li><a href="#" data-param="03">AUX</a></li>
+		<li><a href="#" data-param="05">PC</a></li>
+		<li><a href="#" data-param="10">DVD</a></li>
+		<li><a href="#" data-param="26">TUNER</a></li>
+		<li><a href="#" data-param="2B">NETWORK</a></li>
+	</ul>
+</div>
+
+<div class="window" id="volume_control">
+	<h1 data-command="MVL">VOLUME</h1>
+
+	<input type="range" name="volume" id="volume"  min="0" max="64" data-show-value="true"><Br />  <b>Mute:</b> <span id="mute"><a href="#" data-command="AMT" data-param="01"></a></span><Br /> 
+	Current Volume: <span id="current_vol">??</span>
+</div>
+
+<div class="window" id="listening_mode">
+	<h1 data-command="LMD">LISTENING MODE</h1>
+	<dl>
+		<dt>Current:</dt>
+		<dd id="current"><a href="#" data-param="QSTN">Get current</a></dd>
+	</dl>
+	<ul>
+		<li><a href="#" data-param="00">STEREO</a></li>
+		<li><a href="#" data-param="01">DIRECT</a></li>
+		<li><a href="#" data-param="02">SURROUND</a></li>
+		<li><a href="#" data-param="03">FILM</a></li>
+		<li><a href="#" data-param="04">THX</a></li>
+		<li><a href="#" data-param="05">ACTION</a></li>
+		<li><a href="#" data-param="06">MUSICAL</a></li>
+		<li><a href="#" data-param="07">MONO MOVIE</a></li>
+		<li><a href="#" data-param="08">ORCHESTRA</a></li>
+		<li><a href="#" data-param="09">UNPLUGGED</a></li>
+		<li><a href="#" data-param="0A">STUDIO-MIX</a></li>
+		<li><a href="#" data-param="0B">TV LOGIC</a></li>
+		<li><a href="#" data-param="0C">ALL CH STEREO</a></li>
+		<li><a href="#" data-param="0D">THEATER-DIMENSIONAL</a></li>
+		<li><a href="#" data-param="0E">ENHANCED 7</a></li>
+		<li><a href="#" data-param="0F">MONO</a></li>
+		<li><a href="#" data-param="11">PURE AUDIO</a></li>
+		<!--<li><a href="#" data-param="12">MULTIPLEX</a></li>-->
+		<li><a href="#" data-param="13">FULL MONO</a></li>
+		<li><a href="#" data-param="16">Audyssey DSX</a></li>
+		<li><a href="#" data-param="1F">WHOLE HOUSE MODE</a></li>
+		<li><a href="#" data-param="0A">STUDIO-MIX</a></li>
+	</ul>
+</div>
+
+ </body>
+</html>
